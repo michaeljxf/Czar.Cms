@@ -10,7 +10,7 @@ namespace Czar.Cms.Core.Options
     /// 2018.12.12
     /// 代码生成选项
     /// </summary>
-    public class CodeGenerateOption:DbOpion
+    public class CodeGenerateOption:DbOption
     {
        
         /// <summary>
@@ -40,5 +40,13 @@ namespace Czar.Cms.Core.Options
         /// 仓储命名空间
         /// </summary>
         public string RepositoryNamespace { get; set; }
+        /// <summary>
+        /// 服务接口命名空间
+        /// </summary>
+        public string IServicesNamespace { get; set; }
+        /// <summary>
+        /// 服务命名空间
+        /// </summary>
+        public string ServicesNamespace { get; set; }
     }
 }

@@ -71,6 +71,9 @@ namespace Czar.Cms.Core.CodeGenerator
                         GenerateIRepository(table, pkTypeName, isCoveredExsited);
                         GenerateRepository(table, pkTypeName, isCoveredExsited);
                     }
+                    GenerateIServices(table,isCoveredExsited);
+                    GenerateServices(table, isCoveredExsited);
+
                 }
             }
         }
@@ -82,16 +85,7 @@ namespace Czar.Cms.Core.CodeGenerator
         /// <param name="isCoveredExsited">是否覆盖</param>
         private void GenerateEntity(DbTable table, bool isCoveredExsited = true)
         {
-            var modelPath = _options.OutputPath + Delimiter + "Models"; ;
-            if (!Directory.Exists(modelPath))
-            {
-                Directory.CreateDirectory(modelPath);
-            }
-
-            var fullPath = modelPath + Delimiter + table.TableName + ".cs";
-            if (File.Exists(fullPath) && !isCoveredExsited)
-                return;
-
+           
             var pkTypeName = table.Columns.First(m => m.IsPrimaryKey).CSharpType;
             var sb = new StringBuilder();
             foreach (var column in table.Columns)
@@ -99,6 +93,7 @@ namespace Czar.Cms.Core.CodeGenerator
                 var tmp = GenerateEntityProperty(table.TableName, column);
                 sb.AppendLine(tmp);
             }
+            GenerateModelpath(table, out string path, out string pathP);
             var content = ReadTemplate("ModelTemplate.txt");
             content = content.Replace("{GeneratorTime}", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"))
                 .Replace("{ModelsNamespace}", _options.ModelsNamespace)
@@ -106,8 +101,69 @@ namespace Czar.Cms.Core.CodeGenerator
                 .Replace("{Comment}", table.TableComment)
                 .Replace("{ModelName}", table.TableName)
                 .Replace("{ModelProperties}", sb.ToString());
+            WriteAndSave(path, content);
+            #region 新建一个部分类来添加一些扩展属性
+            var contentP = ReadTemplate("ModelTemplate.txt");
+            contentP = contentP.Replace("{GeneratorTime}", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"))
+                .Replace("{ModelsNamespace}", _options.ModelsNamespace)
+                .Replace("{Author}", _options.Author)
+                .Replace("{Comment}", table.TableComment)
+                .Replace("{ModelName}", table.TableName)
+                .Replace("{ModelProperties}","");
+            WriteAndSave(pathP, contentP);
+            #endregion
+        }
+
+        /// <summary>
+        /// 生成IService层代码文件
+        /// </summary>
+        /// <param name="modelTypeName"></param>
+        /// <param name="keyTypeName"></param>
+        /// <param name="ifExsitedCovered"></param>
+        private void GenerateIServices(DbTable table, bool ifExsitedCovered = true)
+        {
+            var iServicesPath = _options.OutputPath + Delimiter + "IServices";
+            if (!Directory.Exists(iServicesPath))
+            {
+                Directory.CreateDirectory(iServicesPath);
+            }
+            var fullPath = iServicesPath + Delimiter + "I" + table.TableName + "Service.cs";
+            if (File.Exists(fullPath) && !ifExsitedCovered)
+                return;
+            var content = ReadTemplate("IServicesTemplate.txt");
+            content = content.Replace("{Comment}", table.TableComment)
+                .Replace("{Author}", _options.Author)
+                .Replace("{GeneratorTime}", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"))
+                .Replace("{IServicesNamespace}", _options.IServicesNamespace)
+                .Replace("{ModelName}", table.TableName);
             WriteAndSave(fullPath, content);
         }
+
+        /// <summary>
+        /// 生成Services层代码文件
+        /// </summary>
+        /// <param name="modelTypeName"></param>
+        /// <param name="keyTypeName"></param>
+        /// <param name="ifExsitedCovered"></param>
+        private void GenerateServices(DbTable table,  bool ifExsitedCovered = true)
+        {
+            var repositoryPath = _options.OutputPath + Delimiter + "Services";
+            if (!Directory.Exists(repositoryPath))
+            {
+                Directory.CreateDirectory(repositoryPath);
+            }
+            var fullPath = repositoryPath + Delimiter + table.TableName + "Service.cs";
+            if (File.Exists(fullPath) && !ifExsitedCovered)
+                return;
+            var content = ReadTemplate("ServiceTemplate.txt");
+            content = content.Replace("{Comment}", table.TableComment)
+                .Replace("{Author}", _options.Author)
+                .Replace("{GeneratorTime}", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"))
+                .Replace("{ServicesNamespace}", _options.ServicesNamespace)
+                .Replace("{ModelName}", table.TableName);
+            WriteAndSave(fullPath, content);
+        }
+
 
         /// <summary>
         /// 生成IRepository层代码文件
@@ -192,10 +248,10 @@ namespace Czar.Cms.Core.CodeGenerator
                     sb.AppendLine("\t\t[Required]");
                 }
 
-                //if (column.ColumnLength.HasValue && column.ColumnLength.Value > 0)
-                //{
-                //    sb.AppendLine($"\t\t[MaxLength({column.ColumnLength.Value})]");
-                //}
+                if (column.ColumnLength.HasValue && column.ColumnLength.Value > 0)
+                {
+                    sb.AppendLine($"\t\t[MaxLength({column.ColumnLength.Value})]");
+                }
                 //if (column.IsIdentity)
                 //{
                 //    sb.AppendLine("\t\t[DatabaseGenerated(DatabaseGeneratedOption.Identity)]");
@@ -209,9 +265,38 @@ namespace Czar.Cms.Core.CodeGenerator
                 }
 
                 sb.AppendLine($"\t\tpublic {colType} {column.ColName} " + "{get;set;}");
-            }
+        }
 
             return sb.ToString();
+        }
+
+        /// <summary>
+        /// 根据表格信息生成实体路径
+        /// </summary>
+        /// <param name="table">表信息</param>
+        /// <param name="path">实体路径</param>
+        /// <param name="pathP">部分类路径</param>
+        private void GenerateModelpath(DbTable table,out string path,out string pathP)
+        {
+            var modelPath = _options.OutputPath + Delimiter + "Models"; ;
+            if (!Directory.Exists(modelPath))
+            {
+                Directory.CreateDirectory(modelPath);
+            }
+            StringBuilder fullPath = new StringBuilder();
+            fullPath.Append(modelPath);
+            fullPath.Append(Delimiter);
+            fullPath.Append("Partial");
+            if (!Directory.Exists(fullPath.ToString()))
+            {
+                Directory.CreateDirectory(fullPath.ToString());
+            }
+            fullPath.Append(Delimiter);
+            fullPath.Append(table.TableName);
+            fullPath.Append(".cs");
+            pathP = fullPath.ToString();
+            path = fullPath.Replace("Partial"+Delimiter, "").ToString();
+  
         }
 
         /// <summary>
